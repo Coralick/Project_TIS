@@ -9,8 +9,19 @@ import (
 var router *gin.Engine
 var clientList map[string]*Player
 
+type Point struct {
+	x float64
+	y float64
+}
+type Player struct {
+	Conn   *websocket.Conn `json:"-"`
+	Name string `json:"name"`
+	Coords Point `json:"coords"`
+	Radius float64 `json:"radius"`
+	Color  string `json:"color"`
+}
 func main() {
-	clientList = make(map[*websocket.Conn]string)
+	clientList = make(map[*websocket.Conn]*Player)
 	router := gin.Default()
 	router.LoadHTMLGlob("html/*.html")
 	router.Static("assets", "assets")
@@ -61,9 +72,8 @@ func MovePlayer(player *Player) {
 		if e != nil {
 			fmt.Println(e)
 		}
-		delete(clientList, player )
-
-	}
+		delete(clientList,  player )
+	}()
 }
 	//func ChayHandler(conn *websocket.Conn) {
 	//	defer func() {
