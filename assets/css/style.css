@@ -1,0 +1,34 @@
+#userName{
+    border: 3px solid black;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    background-color: grey;
+    color: bisque;
+}
+#text{
+    border: 3px solid black;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    background-color: grey;
+    color: bisque;
+}
+
+.cute{
+    width: 50%;
+}
+
+.inputStyle{
+    width: 300px;
+    height: 30px;
+    border: 3px solid;
+    border-image: linear-gradient(blue, red, green);
+    background: none;
+    color: #7f7f7f;
+}
+#sendButton{
+    border: 3px solid black;
+    background-color: grey;
+    color: bisque;
+    border-radius: 5px;
+    width: 100%;
+}
