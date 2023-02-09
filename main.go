@@ -1,53 +1,60 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"time"
 )
 
 var router *gin.Engine
-var clientList map[string]*Player
+var players map[string]*Player
+var moveEvent chan int
 
-type Point struct {
-	x float64
-	y float64
-}
-type Player struct {
-	Conn   *websocket.Conn `json:"-"`
-	Name string `json:"name"`
-	Coords Point `json:"coords"`
-	Radius float64 `json:"radius"`
-	Color  string `json:"color"`
-}
 func main() {
-	clientList = make(map[*websocket.Conn]*Player)
+
+	players = make(map[string]*Player)
+	moveEvent = make(chan int)
 	router := gin.Default()
 	router.LoadHTMLGlob("html/*.html")
 	router.Static("assets", "assets")
+
 	router.GET("/", func(context *gin.Context) {
-		context.HTML(200, "index.html", nil)
-	})
-	router.GET("/enter", func(context *gin.Context) {
 		context.HTML(200, "input.html", nil)
 	})
 
 	upgrader := websocket.Upgrader{}
-	router.GET("/chat/:name", func(context *gin.Context) {
+	router.GET("/game!/:name", func(context *gin.Context) {
+		name := context.Param("name")
+		context.HTML(200, "index.html", name)
+	})
+	router.GET("/game/:name", func(context *gin.Context) {
 		connection, e := upgrader.Upgrade(context.Writer, context.Request, nil)
 		if e != nil {
+			fmt.Println(e)
 			return
 		}
 		name := context.Param("name")
-		player := clientList[name]
+		fmt.Println(name)
+
+		fmt.Println("name")
+
+		player := players[name]
+		if player != nil {
+			context.JSON(400, " Такое имя уже существует")
+			return
+		}
+
 		//clientList[connection] = ""
 
-		clientList[name] = &Player{
+		players[name] = &Player{
 			Conn:   connection,
 			Coords: Point{},
 			Color:  "#FF0000",
 			Radius: 1,
 		}
+
 		go MovePlayer(player)
 		//go ChatHandler(connection)
 		//_, data, e := connection.ReadMessage()
@@ -61,39 +68,72 @@ func main() {
 
 func Game() {
 	for {
-		for name, player := range clientList {
-			player.Conn.WriteMessage()
+		for _, player := range players {
+			fmt.Println(player)
+			//player.Conn.WriteMessage()
 		}
 	}
 }
+func UpdateGame() {
+	for {
+		playerList := make([]*Player, 0)
+		for _, player := range players {
+			playerList = append(playerList, player)
+		}
+		transferData, e := json.Marshal(playerList)
+		if e != nil {
+			continue
+		}
+		data, _ := json.Marshal(Transfer{
+			Type: 3,
+			Data: string(transferData),
+		})
+		for _, player := range players {
+			if player.Conn == nil {
+				continue
+			}
+			_ = player.Conn.WriteMessage(websocket.TextMessage, data)
+		}
+		time.Sleep(time.Millisecond * 25)
+	}
+}
+
 func MovePlayer(player *Player) {
 	defer func() {
 		e := recover()
 		if e != nil {
 			fmt.Println(e)
 		}
-		delete(clientList,  player )
-	}()
-}
-	//func ChayHandler(conn *websocket.Conn) {
-	//	defer func() {
-	//		e := recover()
-	//		if e != nil {
-	//			fmt.Println(e)
-	//		}
-	//		delete(clientList, conn)
-	//	}()
-	//
-	//	for {
-	//		_, data, e := conn.ReadMessage()
-	//		if e != nil {
-	//			continue
-	//		}
-	//
-	//		for client := range clientList {
-	//			if conn != client {
-	//				_ = client.WriteMessage(websocket.TextMessage, data)
-	//			}
-	//		}
-	//	}
+		delete(players, player.Name)
 
+	}()
+	var d = "Печеньки"
+	for {
+		_, data, e := player.Conn.ReadMessage()
+		if e != nil {
+			continue
+		}
+		transfer := &Transfer{}
+		e = json.Unmarshal(data, transfer)
+		if e != nil {
+			continue
+		}
+		switch transfer.Type {
+		case 1, 2:
+			for _, p := range players {
+				if player != p && p.Conn != nil {
+					p.Conn.WriteMessage(websocket.TextMessage, data)
+				}
+			}
+		case 3:
+			direction := &Point{}
+			e = json.Unmarshal([]byte(transfer.Data), d)
+			if e != nil {
+				continue
+			}
+			player.Coords.x += direction.x
+			player.Coords.y += direction.y
+
+		}
+	}
+}
